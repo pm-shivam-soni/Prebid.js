@@ -428,6 +428,23 @@ function getFloorFetchStatus(floorData) {
 
 function getListOfIdentityPartners() {
   const namespace = getGlobal();
+  // Get all EIDs from various sources
+  // 1. Get EIDs from auction's getFPD method which normalizes all EIDs
+  const auctionManager = namespace.adUnits && namespace.auctionManager;
+  let allEids = [];
+  
+  // Get EIDs from the latest auction if available
+  if (auctionManager && auctionManager.getLastAuction) {
+    const latestAuction = auctionManager.getLastAuction();
+    if (latestAuction && latestAuction.getFPD) {
+      const fpdData = latestAuction.getFPD();
+      if (fpdData && fpdData.global && fpdData.global.user && fpdData.global.user.ext && fpdData.global.user.ext.eids) {
+        allEids = fpdData.global.user.ext.eids || [];
+      }
+    }
+  }
+  
+  // 2. Fallback to other sources if auction data is not available
   const publisherProvidedEids = namespace.getConfig("ortb2.user.eids") || [];
   const availableUserIds = namespace.getUserIds() || {};
   const identityModules = namespace.getConfig('userSync')?.userIds || [];
@@ -438,15 +455,23 @@ function getListOfIdentityPartners() {
     return mapping;
   }, {});
 
+  // Extract partner names from user IDs
   const userIdPartners = Object.keys(availableUserIds).map(storageName =>
     identityModuleNameMap[storageName] || storageName
   );
 
+  // Extract partner names from publisher provided EIDs
   const publisherProvidedEidList = publisherProvidedEids.map(eid =>
     identityModuleNameMap[eid.source] || eid.source
   );
+  
+  // Extract partner names from auction EIDs
+  const auctionEidList = allEids.map(eid => 
+    identityModuleNameMap[eid.source] || eid.source
+  );
 
-  const identityPartners = Array.from(new Set([...userIdPartners, ...publisherProvidedEidList]));
+  // Combine all sources and remove duplicates
+  const identityPartners = Array.from(new Set([...userIdPartners, ...publisherProvidedEidList, ...auctionEidList]));
   return identityPartners.length > 0 ? identityPartners : undefined;
 }
 
