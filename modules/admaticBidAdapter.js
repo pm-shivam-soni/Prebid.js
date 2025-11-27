@@ -1,9 +1,11 @@
 import { getCurrencyFromBidderRequest } from '../libraries/ortb2Utils/currency.js';
 import { Renderer } from '../src/Renderer.js';
+
 import { registerBidder } from '../src/adapters/bidderFactory.js';
 import { BANNER, NATIVE, VIDEO } from '../src/mediaTypes.js';
 import { deepAccess, getBidIdParameter, getValue, isArray, logError } from '../src/utils.js';
 import { getUserSyncParams } from '../libraries/userSyncUtils/userSyncUtils.js';
+
 import { interpretNativeAd } from '../libraries/precisoUtils/bidNativeUtils.js';
 
 /**
@@ -13,6 +15,7 @@ import { interpretNativeAd } from '../libraries/precisoUtils/bidNativeUtils.js';
  */
 
 let SYNC_URL = 'https://static.cdn.admatic.com.tr/sync.html';
+
 const BIDDER_CODE = 'admatic';
 const RENDERER_URL = 'https://acdn.adnxs.com/video/outstream/ANOutstreamVideo.js';
 
@@ -331,7 +334,7 @@ function enrichSlotWithFloors(slot, bidRequest) {
 }
 
 function parseSizes(sizes, parser = s => s) {
-  if (sizes == undefined) {
+  if (sizes === undefined) {
     return [];
   }
   if (Array.isArray(sizes[0])) { // is there several sizes ? (ie. [[728,90],[200,300]])
@@ -403,7 +406,7 @@ function _validateId(id) {
 }
 
 function _validateString(str) {
-  return (typeof str == 'string');
+  return (typeof str === 'string');
 }
 
 registerBidder(spec);

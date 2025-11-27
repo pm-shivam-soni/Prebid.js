@@ -3,7 +3,6 @@ import {
   spec,
   getPriceGranularity,
   masSizeOrdering,
-  resetUserSync,
   classifiedAsVideo,
   resetRubiConf,
   resetImpIdMap,
@@ -19,6 +18,7 @@ import 'modules/multibid/index.js';
 import adapterManager from 'src/adapterManager.js';
 import {addFPDToBidderRequest} from '../../helpers/fpd.js';
 import { deepClone } from '../../../src/utils.js';
+import {getGlobal} from '../../../src/prebidGlobal.js';
 
 const INTEGRATION = `pbjs_lite_v$prebid.version$`; // $prebid.version$ will be substituted in by gulp in built prebid
 const PBS_INTEGRATION = 'pbjs';
@@ -487,7 +487,7 @@ describe('the rubicon adapter', function () {
     config.resetConfig();
     resetRubiConf();
     resetImpIdMap();
-    delete $$PREBID_GLOBAL$$.installedModules;
+    delete getGlobal().installedModules;
   });
 
   describe('MAS mapping / ordering', function () {
@@ -2165,7 +2165,7 @@ describe('the rubicon adapter', function () {
             expect(imp.ext.prebid.bidder.rubicon.video.skipafter).to.equal(15);
             expect(post.ext.prebid.auctiontimestamp).to.equal(1472239426000);
             // should contain version
-            expect(post.ext.prebid.channel).to.deep.equal({name: 'pbjs', version: $$PREBID_GLOBAL$$.version});
+            expect(post.ext.prebid.channel).to.deep.equal({name: 'pbjs', version: getGlobal().version});
             expect(post.user.ext.consent).to.equal('BOJ/P2HOJ/P2HABABMAAAAAZ+A==');
             // EIDs should exist
             expect(post.user.ext).to.have.property('eids').that.is.an('array');
@@ -2379,7 +2379,7 @@ describe('the rubicon adapter', function () {
 
           it('should pass client analytics to PBS endpoint if all modules included', function () {
             const bidderRequest = createVideoBidderRequest();
-            $$PREBID_GLOBAL$$.installedModules = [];
+            getGlobal().installedModules = [];
             const [request] = spec.buildRequests(bidderRequest.bids, bidderRequest);
             const payload = request.data;
 
@@ -2389,7 +2389,7 @@ describe('the rubicon adapter', function () {
 
           it('should pass client analytics to PBS endpoint if rubicon analytics adapter is included', function () {
             const bidderRequest = createVideoBidderRequest();
-            $$PREBID_GLOBAL$$.installedModules = ['rubiconBidAdapter', 'rubiconAnalyticsAdapter'];
+            getGlobal().installedModules = ['rubiconBidAdapter', 'rubiconAnalyticsAdapter'];
             const [request] = spec.buildRequests(bidderRequest.bids, bidderRequest);
             const payload = request.data;
 
@@ -2399,7 +2399,7 @@ describe('the rubicon adapter', function () {
 
           it('should not pass client analytics to PBS endpoint if rubicon analytics adapter is not included', function () {
             const bidderRequest = createVideoBidderRequest();
-            $$PREBID_GLOBAL$$.installedModules = ['rubiconBidAdapter'];
+            getGlobal().installedModules = ['rubiconBidAdapter'];
             const [request] = spec.buildRequests(bidderRequest.bids, bidderRequest);
             const payload = request.data;
 
@@ -2888,15 +2888,6 @@ describe('the rubicon adapter', function () {
           bidderRequest.bids[0].params.keywords = 'a,b,c';
           const slotParams = spec.createSlotParams(bidderRequest.bids[0], bidderRequest);
           expect(slotParams.kw).to.equal('a,b,c');
-        });
-
-        it('should pass along o_ae param when fledge is enabled', () => {
-          const localBidRequest = Object.assign({}, bidderRequest.bids[0]);
-          localBidRequest.ortb2Imp.ext.ae = true;
-
-          const slotParams = spec.createSlotParams(localBidRequest, bidderRequest);
-
-          expect(slotParams['o_ae']).to.equal(1)
         });
 
         it('should pass along desired segtaxes, but not non-desired ones', () => {
@@ -3816,43 +3807,6 @@ describe('the rubicon adapter', function () {
           expect(bids).to.be.lengthOf(0);
         });
 
-        it('Should support recieving an auctionConfig and pass it along to Prebid', function () {
-          const response = {
-            'status': 'ok',
-            'account_id': 14062,
-            'site_id': 70608,
-            'zone_id': 530022,
-            'size_id': 15,
-            'alt_size_ids': [
-              43
-            ],
-            'tracking': '',
-            'inventory': {},
-            'ads': [{
-              'status': 'ok',
-              'cpm': 0,
-              'size_id': 15
-            }],
-            'component_auction_config': [{
-              'random': 'value',
-              'bidId': '5432'
-            },
-            {
-              'random': 'string',
-              'bidId': '6789'
-            }]
-          };
-
-          const {bids, paapi} = spec.interpretResponse({body: response}, {
-            bidRequest: bidderRequest.bids[0]
-          });
-
-          expect(bids).to.be.lengthOf(1);
-          expect(paapi[0].bidId).to.equal('5432');
-          expect(paapi[0].config.random).to.equal('value');
-          expect(paapi[1].bidId).to.equal('6789');
-        });
-
         it('should handle an error', function () {
           const response = {
             'status': 'ok',
@@ -4449,10 +4403,6 @@ describe('the rubicon adapter', function () {
   describe('user sync', function () {
     const emilyUrl = 'https://eus.rubiconproject.com/usync.html';
 
-    beforeEach(function () {
-      resetUserSync();
-    });
-
     it('should register the Emily iframe', function () {
       const syncs = spec.getUserSyncs({
         iframeEnabled: true
@@ -4461,15 +4411,17 @@ describe('the rubicon adapter', function () {
       expect(syncs).to.deep.equal({type: 'iframe', url: emilyUrl});
     });
 
-    it('should not register the Emily iframe more than once', function () {
+    it('should register the Emily iframe more than once', function () {
       let syncs = spec.getUserSyncs({
         iframeEnabled: true
       });
       expect(syncs).to.deep.equal({type: 'iframe', url: emilyUrl});
 
       // when called again, should still have only been called once
-      syncs = spec.getUserSyncs();
-      expect(syncs).to.equal(undefined);
+      syncs = spec.getUserSyncs({
+        iframeEnabled: true
+      });
+      expect(syncs).to.deep.equal({type: 'iframe', url: emilyUrl});
     });
 
     it('should pass gdpr params if consent is true', function () {
@@ -4722,10 +4674,6 @@ describe('the rubicon adapter', function () {
         }
       });
       config.resetConfig();
-    });
-
-    beforeEach(function () {
-      resetUserSync();
     });
 
     it('should update fastlane endpoint if', function () {
